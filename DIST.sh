@@ -6,8 +6,6 @@
 #   2016-01-05
 #
 
-exit 0
-
 PACKAGE=iotdb-transport-redis
 DIST_ROOT=/var/tmp/.dist.$$
 

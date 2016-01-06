@@ -125,17 +125,6 @@ RedisTransport.prototype._setup_redis = function() {
         ops.push(_.bind(self.native.select, self.native, parseInt(self.initd.db)));
     }
 
-    /*
-    ops.push(_.bind(self.sub.psubscribe, self.sub, "/*"));
-
-    ops.push(function(callback) {
-        self.sub.on("pmessage", function(pattern, channel, count) {
-            console.log("HERE:SUB.2", channel, count);
-        });
-        callback(null, null);
-    });
-    */
-
     ops.push(function(callback) { callback(null, null) });
 
     /* do it */
