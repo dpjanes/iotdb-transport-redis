@@ -26,9 +26,12 @@ var iotdb = require('iotdb');
 var iotdb_transport = require('iotdb-transport');
 var _ = iotdb._;
 
+var redis = require('redis');
 var path = require('path');
+var async = require('async');
 
 var util = require('util');
+var events = require('events');
 var url = require('url');
 
 var logger = iotdb.logger({
@@ -41,7 +44,7 @@ var logger = iotdb.logger({
 /**
  *  Create a transport for Redis.
  */
-var RedisTransport = function (initd, native) {
+var RedisTransport = function (initd) {
     var self = this;
 
     self.initd = _.defaults(
@@ -56,15 +59,167 @@ var RedisTransport = function (initd, native) {
         },
         iotdb.keystore().get("/transports/RedisTransport/initd"),
         {
-            prefix: ""
+            prefix: "/",
+            auth: null,
+            host: "127.0.0.1",
+            port: 6379,
+            db: 2,
         }
     );
-    
-    self.native = native;
+
+    self._emitter = new events.EventEmitter();
+
+    self.ready = null;
+
+    // do not use these directly, use the _redis_* functions
+    self.native = null;
+    self.pub = null;
+    self.sub = null;
+
+    this._setup_redis();
 };
 
 RedisTransport.prototype = new iotdb_transport.Transport;
 RedisTransport.prototype._class = "RedisTransport";
+
+RedisTransport.prototype._setup_redis = function() {
+    var self = this;
+
+    logger.info({
+        method: "RedisTransport",
+        host: self.initd.host,
+        port: self.initd.port,
+    }, "connecting to redis");
+
+    self.native = redis.createClient({
+        host: self.initd.host,
+        no_ready_check: true,
+    }); 
+
+    self.pub = redis.createClient({
+        host: self.initd.host,
+        no_ready_check: true,
+    }); 
+
+    self.sub = redis.createClient({
+        host: self.initd.host,
+        no_ready_check: true,
+    }); 
+
+    logger.info({
+        method: "RedisTransport/createClient",
+    }, "authorizing");
+
+    /* authorization sequence */
+    var ops = [];
+
+    if (self.initd.password) {
+        ops.push(_.bind(self.native.auth, self.native, self.initd.password));
+        ops.push(_.bind(self.pub.auth, self.pub, self.initd.password));
+        ops.push(_.bind(self.sub.auth, self.sub, self.initd.password));
+    }
+
+    if (self.initd.db) {
+        ops.push(_.bind(self.native.select, self.native, parseInt(self.initd.db)));
+    }
+
+    /*
+    ops.push(_.bind(self.sub.psubscribe, self.sub, "/*"));
+
+    ops.push(function(callback) {
+        self.sub.on("pmessage", function(pattern, channel, count) {
+            console.log("HERE:SUB.2", channel, count);
+        });
+        callback(null, null);
+    });
+    */
+
+    ops.push(function(callback) { callback(null, null) });
+
+    /* do it */
+    async.series(ops, function(error, result) {
+        if (error) {
+            logger.error({
+                method: "RedisTransport/createClient/client.auth",
+                error: _.error.message(error),
+            }, "error authorizing");
+
+            self.ready = false;
+            return;
+        }
+
+        logger.info({
+            method: "RedisTransport/createClient",
+        }, "ready");
+
+        self.ready = true;
+        self._emitter.emit("ready");
+    });
+};
+
+RedisTransport.prototype._redis_client = function(callback) {
+    var self = this;
+
+    if (self.ready) {
+        callback(null, self.native);
+    } else if (self.ready === false) {
+        logger.error({
+            method: "_redis_client",
+            cause: "check earlier error messages",
+        }, "Redis not available");
+
+        callback(new Error("redis not available"));
+    } else if (self.ready === null) {
+        self._emitter.once("ready", function() {
+            if (self.ready !== null) {
+                self._redis_client(callback);
+            }
+        });
+    }
+};
+
+RedisTransport.prototype._redis_pub = function(callback) {
+    var self = this;
+
+    if (self.ready) {
+        callback(null, self.pub);
+    } else if (self.ready === false) {
+        callback(new Error("redis not available"));
+    } else if (self.ready === null) {
+        self._emitter.once("ready", function() {
+            if (self.ready !== null) {
+                self._redis_pub(callback);
+            }
+        });
+    }
+};
+
+RedisTransport.prototype._redis_publish = function(channel, value) {
+    var self = this;
+
+    self._redis_pub(function(error, pub) {
+        if (pub) {
+            pub.publish(channel, value || "");
+        }
+    });
+};
+
+RedisTransport.prototype._redis_sub = function(callback) {
+    var self = this;
+
+    if (self.ready) {
+        callback(null, self.sub);
+    } else if (self.ready === false) {
+        callback(new Error("redis not available"));
+    } else if (self.ready === null) {
+        self._emitter.once("ready", function() {
+            if (self.ready !== null) {
+                self._redis_sub(callback);
+            }
+        });
+    }
+};
+
 
 /* --- methods --- */
 
@@ -112,11 +267,24 @@ RedisTransport.prototype.get = function(paramd, callback) {
 
     var channel = self.initd.channel(self.initd, paramd.id, paramd.band);
 
-    // callback(id, band, null); does not exist
-    // OR
-    // callback(id, band, undefined); don't know
-    // OR
-    // callback(id, band, d); data
+    var cd = _.shallowCopy(paramd);
+
+    self._redis_client(function(error, client) {
+        if (error) {
+            cd.error = error;
+            return callback(cd);
+        }
+
+        client.get(channel, function(error, result) {
+            if (error) {
+                cd.error = error;
+                return callback(cd);
+            }
+
+            cd.value = self.initd.unpack(result);
+            callback(cd);
+        });
+    });
 };
 
 /**
@@ -128,9 +296,21 @@ RedisTransport.prototype.update = function(paramd, callback) {
     self._validate_updated(paramd, callback);
 
     var channel = self.initd.channel(self.initd, paramd.id, paramd.band);
-    var d = self.pack(value, paramd.id, paramd.band);
+    var packed = self.initd.pack(paramd.value, paramd.id, paramd.band);
 
-    // do something
+    var cd = _.shallowCopy(paramd);
+
+    self._redis_client(function(error, client) {
+        if (error) {
+            cd.error = error;
+            return callback(cd);
+        }
+
+        client.set(channel, packed, function(error) {
+            callback(cd);
+            self._redis_publish(channel);
+        });
+    });
 };
 
 /**
@@ -145,6 +325,44 @@ RedisTransport.prototype.updated = function(paramd, callback) {
     }
 
     self._validate_updated(paramd, callback);
+
+    paramd = _.shallowCopy(paramd);
+
+    var channel = self.initd.channel(self.initd, paramd.id, paramd.band);
+
+    var _on_pmessage = function(pattern, topic, value) {
+        var parts = self.initd.unchannel(self.initd, topic);
+        if (!parts) {
+            return;
+        }
+
+        var topic_id = parts[0];
+        var topic_band = parts[1];
+
+        if (paramd.id && (topic_id !== paramd.id)) {
+            return;
+        }
+        if (paramd.band && (topic_band !== paramd.band)) {
+            return;
+        }
+
+        var cd = _.shallowCopy(paramd);
+        cd.id = topic_id || null;
+        cd.band = topic_band || null;
+        cd.value = undefined;
+
+        callback(cd);
+    };
+
+    self._redis_sub(function(error, sub) {
+        if (error) {
+            cd.error = error;
+            return callback(cd);
+        }
+
+        self.sub.on("pmessage", _on_pmessage);
+        sub.psubscribe(channel);
+    });
 };
 
 /**
@@ -155,10 +373,11 @@ RedisTransport.prototype.remove = function(paramd, callback) {
 
     self._validate_remove(paramd, callback);
 
-    var channel = self.initd.channel(self.intid, paramd.id, paramd.band);
+    var channel = self.initd.channel(self.initd, paramd.id, paramd.band);
 };
 
 /* --- internals --- */
+
 var _encode = function(s) {
     return s.replace(/[\/$%#.\]\[]/g, function(c) {
         return '%' + c.charCodeAt(0).toString(16);
@@ -169,18 +388,14 @@ var _decode = function(s) {
     return decodeURIComponent(s);
 }
 
-var _unpack = function(d) {
-    return _.d.transform(d, {
-        pre: _.ld_compact,
-        key: _decode,
-    });
+var _unpack = function(v) {
+    return JSON.parse(v);
 };
 
 var _pack = function(d) {
-    return _.d.transform(d, {
+    return JSON.stringify(_.d.transform(d, {
         pre: _.ld_compact,
-        key: _encode,
-    });
+    }));
 };
 
 /**

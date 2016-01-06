@@ -25,6 +25,8 @@ var _update = function() {
             last: "Janes",
             now: now,
         },
+    }, function(d) {
+        console.log("+ _update(callback)", "\n ", d);
     });
 };
 
