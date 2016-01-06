@@ -27,6 +27,8 @@ var iotdb_transport = require('iotdb-transport');
 var _ = iotdb._;
 
 var redis = require('redis');
+var redis_scanner = require('redis-scanner');
+
 var path = require('path');
 var async = require('async');
 
@@ -236,8 +238,41 @@ RedisTransport.prototype.list = function(paramd, callback) {
 
     self._validate_list(paramd, callback);
 
-    callback({
-        end: true,
+    var cd = _.shallowCopy(paramd);
+    var channel = self.initd.channel(self.initd, paramd.id);
+
+    self._redis_client(function(error, client) {
+        if (error) {
+            cd.error = error;
+            return callback(cd);
+        }
+
+        var seend = {};
+        var scanner = new redis_scanner.Scanner(client, 'SCAN', null, {
+            pattern: channel + "*",
+            onData: function(topic) {
+                var parts = self.initd.unchannel(self.initd, topic);
+                if (!parts) {
+                    return;
+                }
+
+                var topic_id = parts[0];
+                if (seend[topic_id]) {
+                    return;
+                }
+
+                seend[topic_id] = true;
+
+                callback({
+                    id: topic_id,
+                });
+            },
+            onEnd: function(err){
+                callback({
+                    end: true,
+                });
+            }
+        }).start();
     });
 };
 

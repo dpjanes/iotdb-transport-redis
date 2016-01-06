@@ -8,6 +8,7 @@
         "iotdb": ">=0.11.0", 
         "iotdb-transport": "~0.0.17", 
         "redis": "~2.4.2", 
+        "redis-scanner": "~0.1.1", 
         "validate": "~3.0.1"
     }, 
     "description": "IOTDB Transport for Redis", 
