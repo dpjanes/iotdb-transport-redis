@@ -66,6 +66,9 @@ var RedisTransport = function (initd) {
             host: "127.0.0.1",
             port: 6379,
             db: 2,
+            add_timestamp: true,
+            check_timestamp: true,
+            pubsub: true,
         }
     );
 
@@ -98,15 +101,17 @@ RedisTransport.prototype._setup_redis = function() {
         no_ready_check: true,
     }); 
 
-    self.pub = redis.createClient({
-        host: self.initd.host,
-        no_ready_check: true,
-    }); 
+    if (self.initd.pubsub) {
+        self.pub = redis.createClient({
+            host: self.initd.host,
+            no_ready_check: true,
+        }); 
 
-    self.sub = redis.createClient({
-        host: self.initd.host,
-        no_ready_check: true,
-    }); 
+        self.sub = redis.createClient({
+            host: self.initd.host,
+            no_ready_check: true,
+        }); 
+    }
 
     logger.info({
         method: "RedisTransport/createClient",
@@ -117,8 +122,10 @@ RedisTransport.prototype._setup_redis = function() {
 
     if (self.initd.password) {
         ops.push(_.bind(self.native.auth, self.native, self.initd.password));
-        ops.push(_.bind(self.pub.auth, self.pub, self.initd.password));
-        ops.push(_.bind(self.sub.auth, self.sub, self.initd.password));
+        if (self.initd.pubsub) {
+            ops.push(_.bind(self.pub.auth, self.pub, self.initd.password));
+            ops.push(_.bind(self.sub.auth, self.sub, self.initd.password));
+        }
     }
 
     if (self.initd.db) {
@@ -172,7 +179,9 @@ RedisTransport.prototype._redis_client = function(callback) {
 RedisTransport.prototype._redis_pub = function(callback) {
     var self = this;
 
-    if (self.ready) {
+    if (!self.initd.pubsub) {
+        callback(null, null);
+    } else if (self.ready) {
         callback(null, self.pub);
     } else if (self.ready === false) {
         callback(new Error("redis not available"));
@@ -198,7 +207,9 @@ RedisTransport.prototype._redis_publish = function(channel, value) {
 RedisTransport.prototype._redis_sub = function(callback) {
     var self = this;
 
-    if (self.ready) {
+    if (!self.initd.pubsub) {
+        callback(null, null);
+    } else if (self.ready) {
         callback(null, self.sub);
     } else if (self.ready === false) {
         callback(new Error("redis not available"));
@@ -319,10 +330,14 @@ RedisTransport.prototype.update = function(paramd, callback) {
 
     self._validate_updated(paramd, callback);
 
-    var channel = self.initd.channel(self.initd, paramd.id, paramd.band);
-    var packed = self.initd.pack(paramd.value, paramd.id, paramd.band);
-
     var cd = _.shallowCopy(paramd);
+
+    if (self.initd.add_timestamp) {
+        cd.value = _.timestamp.add(cd.value);
+    }
+
+    var channel = self.initd.channel(self.initd, paramd.id, paramd.band);
+    var packed = self.initd.pack(cd.value, paramd.id, paramd.band);
 
     self._redis_client(function(error, client) {
         if (error) {
@@ -330,10 +345,31 @@ RedisTransport.prototype.update = function(paramd, callback) {
             return callback(cd);
         }
 
-        client.set(channel, packed, function(error) {
-            callback(cd);
-            self._redis_publish(channel);
-        });
+        var _set = function() {
+            client.set(channel, packed, function(error) {
+                callback(cd);
+                self._redis_publish(channel);
+            });
+        };
+
+        if (!self.initd.check_timestamp) {
+            _set();
+        } else {
+            client.get(channel, function(error, result) {
+                var old_value = self.initd.unpack(result);
+
+                if (error) {
+                    _set();
+                } else if (!result) {
+                    _set();
+                } else if (_.timestamp.check.dictionary(old_value, cd.value)) {
+                    _set();
+                } else {
+                    cd.error = new Error("out of date");    // maybe error too strong
+                    callback(cd);
+                }
+            });
+        }
     });
 };
 
@@ -382,10 +418,12 @@ RedisTransport.prototype.updated = function(paramd, callback) {
         if (error) {
             cd.error = error;
             return callback(cd);
+        } else if (!sub) {
+            return callback(cd);
+        } else {
+            self.sub.on("pmessage", _on_pmessage);
+            sub.psubscribe(channel);
         }
-
-        self.sub.on("pmessage", _on_pmessage);
-        sub.psubscribe(channel);
     });
 };
 
