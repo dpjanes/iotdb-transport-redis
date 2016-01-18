@@ -69,6 +69,7 @@ var RedisTransport = function (initd) {
             add_timestamp: true,
             check_timestamp: true,
             pubsub: true,
+            verbose: false,
         }
     );
 
@@ -388,7 +389,7 @@ RedisTransport.prototype.updated = function(paramd, callback) {
 
     paramd = _.shallowCopy(paramd);
 
-    var channel = self.initd.channel(self.initd, paramd.id, paramd.band);
+    var channel = self.initd.channel(self.initd, paramd.id || "*", paramd.band || "*");
 
     var _on_pmessage = function(pattern, topic, value) {
         var parts = self.initd.unchannel(self.initd, topic);
@@ -421,6 +422,13 @@ RedisTransport.prototype.updated = function(paramd, callback) {
         } else if (!sub) {
             return callback(cd);
         } else {
+            if (self.initd.verbose) {
+                logger.info({
+                    method: "updated/_redis_sub",
+                    channel: channel,
+                }, "subscribing");
+            }
+
             self.sub.on("pmessage", _on_pmessage);
             sub.psubscribe(channel);
         }

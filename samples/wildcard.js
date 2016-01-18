@@ -12,6 +12,7 @@
 var Transport = require('../RedisTransport').RedisTransport;
 
 var transport = new Transport({
+    verbose: true,
 });
 transport.updated({}, function(ud) {
     if (ud.value === undefined) {
