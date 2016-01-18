@@ -4,9 +4,9 @@
         "url": "https://github.com/dpjanes/iotdb-transport-redis/issues"
     }, 
     "dependencies": {
-        "async": "~1.5.1", 
+        "async": "~1.5.2", 
         "iotdb": ">=0.11.0", 
-        "iotdb-transport": "~0.0.18", 
+        "iotdb-transport": "~0.0.19", 
         "redis": "~2.4.2", 
         "redis-scanner": "~0.1.1", 
         "validate": "~3.0.1"
@@ -14,7 +14,7 @@
     "description": "IOTDB Transport for Redis", 
     "devDependencies": {
         "grunt": "~0.4.5", 
-        "grunt-contrib-jshint": "~0.11.3", 
+        "grunt-contrib-jshint": "~0.12.0", 
         "grunt-contrib-nodeunit": "~0.4.1", 
         "grunt-contrib-uglify": "~0.11.0", 
         "grunt-contrib-watch": "~0.6.1", 
@@ -37,5 +37,5 @@
         "cover": "istanbul cover _mocha tests", 
         "test": "grunt"
     }, 
-    "version": "0.0.1"
+    "version": "0.0.2"
 }
