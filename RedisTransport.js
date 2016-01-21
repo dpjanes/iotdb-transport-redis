@@ -41,6 +41,8 @@ var logger = iotdb.logger({
     module: 'RedisTransport',
 });
 
+var noop = function() {};
+
 /* --- constructor --- */
 
 /**
@@ -195,12 +197,17 @@ RedisTransport.prototype._redis_pub = function(callback) {
     }
 };
 
-RedisTransport.prototype._redis_publish = function(channel, value) {
+RedisTransport.prototype._redis_publish = function(channel, callback) {
     var self = this;
+    callback = callback || noop;
 
     self._redis_pub(function(error, pub) {
         if (pub) {
-            pub.publish(channel, value || "");
+            pub.publish(channel, "", function(error) {
+                callback(error || null, null);
+            });
+        } else {
+            callback(null, null);
         }
     });
 };
@@ -329,7 +336,7 @@ RedisTransport.prototype.get = function(paramd, callback) {
 RedisTransport.prototype.update = function(paramd, callback) {
     var self = this;
 
-    self._validate_updated(paramd, callback);
+    self._validate_update(paramd, callback);
 
     var cd = _.shallowCopy(paramd);
 
@@ -340,6 +347,13 @@ RedisTransport.prototype.update = function(paramd, callback) {
     var channel = self.initd.channel(self.initd, paramd.id, paramd.band);
     var packed = self.initd.pack(cd.value, paramd.id, paramd.band);
 
+    if (self.initd.verbose) {
+        logger.info({
+            channel: channel,
+            value: cd.value,
+        }, "sending message");
+    }
+
     self._redis_client(function(error, client) {
         if (error) {
             cd.error = error;
@@ -348,8 +362,14 @@ RedisTransport.prototype.update = function(paramd, callback) {
 
         var _set = function() {
             client.set(channel, packed, function(error) {
-                callback(cd);
-                self._redis_publish(channel);
+                if (error) {
+                    cd.error = error;
+                    return callback(cd);
+                }
+
+                self._redis_publish(channel, function(error) {
+                    return callback(cd);
+                });
             });
         };
 
