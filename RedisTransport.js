@@ -346,19 +346,17 @@ RedisTransport.prototype.put = function(paramd, callback) {
 
     self._redis_client(function(error, client) {
         if (error) {
-            cd.error = error;
-            return callback(cd);
+            return callback(error, cd);
         }
 
         var _set = function() {
             client.set(channel, packed, function(error) {
                 if (error) {
-                    cd.error = error;
-                    return callback(cd);
+                    return callback(error, cd);
                 }
 
                 self._redis_publish(channel, function(error) {
-                    return callback(cd);
+                    return callback(null, cd);
                 });
             });
         };
@@ -376,8 +374,7 @@ RedisTransport.prototype.put = function(paramd, callback) {
                 } else if (_.timestamp.check.dictionary(old_value, cd.value)) {
                     _set();
                 } else {
-                    cd.error = new Error("out of date");    // maybe error too strong
-                    callback(cd);
+                    callback(new errors.Timestamp(), cd);
                 }
             });
         }

@@ -27,8 +27,12 @@ var _update = function() {
         id: "MyThingID", 
         band: "meta", 
         value: value,
-    }, function(d) {
-        console.log("+ _update(callback)", "\n ", d);
+    }, function(error, ud) {
+        if (error) {
+            console.log("#", error);
+            return;
+        }
+        console.log("+ _update/put(callback)", ud);
     });
 };
 

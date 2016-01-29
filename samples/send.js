@@ -25,7 +25,11 @@ var _update = function() {
             last: "Janes",
             now: now,
         },
-    }, function(d) {
+    }, function(error, d) {
+        if (error) {
+            console.log("#", error);
+            return;
+        }
         console.log("+ _update(callback)", "\n ", d);
     });
 };
