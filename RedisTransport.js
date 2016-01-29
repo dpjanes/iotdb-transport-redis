@@ -24,6 +24,7 @@
 
 var iotdb = require('iotdb');
 var iotdb_transport = require('iotdb-transport');
+var errors = iotdb_transport.errors;
 var _ = iotdb._;
 
 var redis = require('redis');
@@ -41,7 +42,10 @@ var logger = iotdb.logger({
     module: 'RedisTransport',
 });
 
-var noop = function() {};
+var _encode;
+var _decode;
+var _pack;
+var _unpack;
 
 /* --- constructor --- */
 
@@ -52,8 +56,7 @@ var RedisTransport = function (initd) {
     var self = this;
 
     self.initd = _.defaults(
-        initd,
-        {
+        initd, {
             channel: iotdb_transport.channel,
             unchannel: iotdb_transport.unchannel,
             encode: _encode,
@@ -61,8 +64,7 @@ var RedisTransport = function (initd) {
             pack: _pack,
             unpack: _unpack,
         },
-        iotdb.keystore().get("/transports/RedisTransport/initd"),
-        {
+        iotdb.keystore().get("/transports/RedisTransport/initd"), {
             prefix: "/",
             auth: null,
             host: "127.0.0.1",
@@ -87,10 +89,10 @@ var RedisTransport = function (initd) {
     this._setup_redis();
 };
 
-RedisTransport.prototype = new iotdb_transport.Transport;
+RedisTransport.prototype = new iotdb_transport.Transport();
 RedisTransport.prototype._class = "RedisTransport";
 
-RedisTransport.prototype._setup_redis = function() {
+RedisTransport.prototype._setup_redis = function () {
     var self = this;
 
     logger.info({
@@ -102,18 +104,18 @@ RedisTransport.prototype._setup_redis = function() {
     self.native = redis.createClient({
         host: self.initd.host,
         no_ready_check: true,
-    }); 
+    });
 
     if (self.initd.pubsub) {
         self.pub = redis.createClient({
             host: self.initd.host,
             no_ready_check: true,
-        }); 
+        });
 
         self.sub = redis.createClient({
             host: self.initd.host,
             no_ready_check: true,
-        }); 
+        });
     }
 
     logger.info({
@@ -135,10 +137,12 @@ RedisTransport.prototype._setup_redis = function() {
         ops.push(_.bind(self.native.select, self.native, parseInt(self.initd.db)));
     }
 
-    ops.push(function(callback) { callback(null, null) });
+    ops.push(function (callback) {
+        callback(null, null);
+    });
 
     /* do it */
-    async.series(ops, function(error, result) {
+    async.series(ops, function (error, result) {
         if (error) {
             logger.error({
                 method: "RedisTransport/createClient/client.auth",
@@ -158,7 +162,7 @@ RedisTransport.prototype._setup_redis = function() {
     });
 };
 
-RedisTransport.prototype._redis_client = function(callback) {
+RedisTransport.prototype._redis_client = function (callback) {
     var self = this;
 
     if (self.ready) {
@@ -171,7 +175,7 @@ RedisTransport.prototype._redis_client = function(callback) {
 
         callback(new Error("redis not available"));
     } else if (self.ready === null) {
-        self._emitter.once("ready", function() {
+        self._emitter.once("ready", function () {
             if (self.ready !== null) {
                 self._redis_client(callback);
             }
@@ -179,7 +183,7 @@ RedisTransport.prototype._redis_client = function(callback) {
     }
 };
 
-RedisTransport.prototype._redis_pub = function(callback) {
+RedisTransport.prototype._redis_pub = function (callback) {
     var self = this;
 
     if (!self.initd.pubsub) {
@@ -189,7 +193,7 @@ RedisTransport.prototype._redis_pub = function(callback) {
     } else if (self.ready === false) {
         callback(new Error("redis not available"));
     } else if (self.ready === null) {
-        self._emitter.once("ready", function() {
+        self._emitter.once("ready", function () {
             if (self.ready !== null) {
                 self._redis_pub(callback);
             }
@@ -197,13 +201,13 @@ RedisTransport.prototype._redis_pub = function(callback) {
     }
 };
 
-RedisTransport.prototype._redis_publish = function(channel, callback) {
+RedisTransport.prototype._redis_publish = function (channel, callback) {
     var self = this;
-    callback = callback || noop;
+    callback = callback || _.noop;
 
-    self._redis_pub(function(error, pub) {
+    self._redis_pub(function (error, pub) {
         if (pub) {
-            pub.publish(channel, "", function(error) {
+            pub.publish(channel, "", function (error) {
                 callback(error || null, null);
             });
         } else {
@@ -212,7 +216,7 @@ RedisTransport.prototype._redis_publish = function(channel, callback) {
     });
 };
 
-RedisTransport.prototype._redis_sub = function(callback) {
+RedisTransport.prototype._redis_sub = function (callback) {
     var self = this;
 
     if (!self.initd.pubsub) {
@@ -222,7 +226,7 @@ RedisTransport.prototype._redis_sub = function(callback) {
     } else if (self.ready === false) {
         callback(new Error("redis not available"));
     } else if (self.ready === null) {
-        self._emitter.once("ready", function() {
+        self._emitter.once("ready", function () {
             if (self.ready !== null) {
                 self._redis_sub(callback);
             }
@@ -236,7 +240,7 @@ RedisTransport.prototype._redis_sub = function(callback) {
 /**
  *  See {iotdb_transport.Transport#Transport} for documentation.
  */
-RedisTransport.prototype.list = function(paramd, callback) {
+RedisTransport.prototype.list = function (paramd, callback) {
     var self = this;
     var ld;
 
@@ -244,7 +248,7 @@ RedisTransport.prototype.list = function(paramd, callback) {
 
     var channel = self.initd.channel(self.initd, paramd.id);
 
-    self._redis_client(function(error, client) {
+    self._redis_client(function (error, client) {
         if (error) {
             ld = _.shallowCopy(paramd);
             return callback(error, ld);
@@ -253,7 +257,7 @@ RedisTransport.prototype.list = function(paramd, callback) {
         var seend = {};
         var scanner = new redis_scanner.Scanner(client, 'SCAN', null, {
             pattern: channel + "*",
-            onData: function(topic) {
+            onData: function (topic) {
                 var parts = self.initd.unchannel(self.initd, topic);
                 if (!parts) {
                     return;
@@ -269,9 +273,9 @@ RedisTransport.prototype.list = function(paramd, callback) {
                 ld = _.shallowCopy(paramd);
                 ld.id = topic_id;
 
-                callback(null, id);
+                callback(null, ld);
             },
-            onEnd: function(err){
+            onEnd: function (err) {
                 callback(null, null);
             }
         }).start();
@@ -281,7 +285,7 @@ RedisTransport.prototype.list = function(paramd, callback) {
 /**
  *  See {iotdb_transport.Transport#Transport} for documentation.
  */
-RedisTransport.prototype.added = function(paramd, callback) {
+RedisTransport.prototype.added = function (paramd, callback) {
     var self = this;
 
     self._validate_added(paramd, callback);
@@ -292,7 +296,7 @@ RedisTransport.prototype.added = function(paramd, callback) {
 /**
  *  See {iotdb_transport.Transport#Transport} for documentation.
  */
-RedisTransport.prototype.get = function(paramd, callback) {
+RedisTransport.prototype.get = function (paramd, callback) {
     var self = this;
 
     self._validate_get(paramd, callback);
@@ -303,12 +307,12 @@ RedisTransport.prototype.get = function(paramd, callback) {
     cd.value = null;
 
     // XXX - should differentiate between NotFound and network errors
-    self._redis_client(function(error, client) {
+    self._redis_client(function (error, client) {
         if (error) {
             return callback(error, cd);
         }
 
-        client.get(channel, function(error, result) {
+        client.get(channel, function (error, result) {
             if (error) {
                 return callback(error, cd);
             }
@@ -322,7 +326,7 @@ RedisTransport.prototype.get = function(paramd, callback) {
 /**
  *  See {iotdb_transport.Transport#Transport} for documentation.
  */
-RedisTransport.prototype.put = function(paramd, callback) {
+RedisTransport.prototype.put = function (paramd, callback) {
     var self = this;
 
     self._validate_update(paramd, callback);
@@ -343,18 +347,18 @@ RedisTransport.prototype.put = function(paramd, callback) {
         }, "sending message");
     }
 
-    self._redis_client(function(error, client) {
+    self._redis_client(function (error, client) {
         if (error) {
             return callback(error, cd);
         }
 
-        var _set = function() {
-            client.set(channel, packed, function(error) {
+        var _set = function () {
+            client.set(channel, packed, function (error) {
                 if (error) {
                     return callback(error, cd);
                 }
 
-                self._redis_publish(channel, function(error) {
+                self._redis_publish(channel, function (error) {
                     return callback(null, cd);
                 });
             });
@@ -363,7 +367,7 @@ RedisTransport.prototype.put = function(paramd, callback) {
         if (!self.initd.check_timestamp) {
             _set();
         } else {
-            client.get(channel, function(error, result) {
+            client.get(channel, function (error, result) {
                 var old_value = self.initd.unpack(result);
 
                 if (error) {
@@ -383,7 +387,7 @@ RedisTransport.prototype.put = function(paramd, callback) {
 /**
  *  See {iotdb_transport.Transport#Transport} for documentation.
  */
-RedisTransport.prototype.updated = function(paramd, callback) {
+RedisTransport.prototype.updated = function (paramd, callback) {
     var self = this;
 
     self._validate_updated(paramd, callback);
@@ -392,7 +396,7 @@ RedisTransport.prototype.updated = function(paramd, callback) {
 
     var channel = self.initd.channel(self.initd, paramd.id || "*", paramd.band || "*");
 
-    var _on_pmessage = function(pattern, topic, value) {
+    var _on_pmessage = function (pattern, topic, value) {
         var parts = self.initd.unchannel(self.initd, topic);
         if (!parts) {
             return;
@@ -416,23 +420,24 @@ RedisTransport.prototype.updated = function(paramd, callback) {
         callback(null, cd);
     };
 
-    self._redis_sub(function(error, sub) {
+    self._redis_sub(function (error, sub) {
         if (error) {
-            cd.error = error;
-            return callback(cd);
-        } else if (!sub) {
-            return callback(cd);
-        } else {
-            if (self.initd.verbose) {
-                logger.info({
-                    method: "updated/_redis_sub",
-                    channel: channel,
-                }, "subscribing");
-            }
-
-            self.sub.on("pmessage", _on_pmessage);
-            sub.psubscribe(channel);
+            return callback(error, paramd);
         }
+
+        if (!sub) {
+            return;
+        }
+
+        if (self.initd.verbose) {
+            logger.info({
+                method: "updated/_redis_sub",
+                channel: channel,
+            }, "subscribing");
+        }
+
+        self.sub.on("pmessage", _on_pmessage);
+        sub.psubscribe(channel);
     });
 };
 
@@ -452,7 +457,7 @@ RedisTransport.prototype.bands = function (paramd, callback) {
 /**
  *  See {iotdb_transport.Transport#Transport} for documentation.
  */
-RedisTransport.prototype.remove = function(paramd, callback) {
+RedisTransport.prototype.remove = function (paramd, callback) {
     var self = this;
 
     self._validate_remove(paramd, callback);
@@ -462,21 +467,21 @@ RedisTransport.prototype.remove = function(paramd, callback) {
 
 /* --- internals --- */
 
-var _encode = function(s) {
-    return s.replace(/[\/$%#.\]\[]/g, function(c) {
+_encode = function (s) {
+    return s.replace(/[\/$%#.\]\[]/g, function (c) {
         return '%' + c.charCodeAt(0).toString(16);
     });
 };
 
-var _decode = function(s) {
+_decode = function (s) {
     return decodeURIComponent(s);
-}
+};
 
-var _unpack = function(v) {
+_unpack = function (v) {
     return JSON.parse(v);
 };
 
-var _pack = function(d) {
+_pack = function (d) {
     return JSON.stringify(_.d.transform(d, {
         pre: _.ld_compact,
     }));
