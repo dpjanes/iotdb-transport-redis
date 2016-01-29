@@ -238,16 +238,16 @@ RedisTransport.prototype._redis_sub = function(callback) {
  */
 RedisTransport.prototype.list = function(paramd, callback) {
     var self = this;
+    var ld;
 
     self._validate_list(paramd, callback);
 
-    var cd = _.shallowCopy(paramd);
     var channel = self.initd.channel(self.initd, paramd.id);
 
     self._redis_client(function(error, client) {
         if (error) {
-            cd.error = error;
-            return callback(cd);
+            ld = _.shallowCopy(paramd);
+            return callback(error, ld);
         }
 
         var seend = {};
@@ -266,14 +266,13 @@ RedisTransport.prototype.list = function(paramd, callback) {
 
                 seend[topic_id] = true;
 
-                callback({
-                    id: topic_id,
-                });
+                ld = _.shallowCopy(paramd);
+                ld.id = topic_id;
+
+                callback(null, id);
             },
             onEnd: function(err){
-                callback({
-                    end: true,
-                });
+                callback(null, null);
             }
         }).start();
     });
