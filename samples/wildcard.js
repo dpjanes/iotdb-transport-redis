@@ -14,7 +14,12 @@ var Transport = require('../RedisTransport').RedisTransport;
 var transport = new Transport({
     verbose: true,
 });
-transport.updated({}, function(ud) {
+transport.updated({}, function(error, ud) {
+    if (error) {
+        console.log("#", error);
+        return;
+    }
+
     if (ud.value === undefined) {
         transport.get(ud, function(error, gd) {
             if (error) {

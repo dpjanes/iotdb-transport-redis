@@ -414,7 +414,7 @@ RedisTransport.prototype.updated = function(paramd, callback) {
         cd.band = topic_band || null;
         cd.value = undefined;
 
-        callback(cd);
+        callback(null, cd);
     };
 
     self._redis_sub(function(error, sub) {
