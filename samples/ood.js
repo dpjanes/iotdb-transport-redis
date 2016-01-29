@@ -23,7 +23,7 @@ var value = {
 value = _.timestamp.add(value);
 
 var _update = function() {
-    transport.update({
+    transport.put({
         id: "MyThingID", 
         band: "meta", 
         value: value,

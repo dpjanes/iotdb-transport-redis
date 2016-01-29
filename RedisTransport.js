@@ -239,11 +239,6 @@ RedisTransport.prototype._redis_sub = function(callback) {
 RedisTransport.prototype.list = function(paramd, callback) {
     var self = this;
 
-    if (arguments.length === 1) {
-        paramd = {};
-        callback = arguments[0];
-    }
-
     self._validate_list(paramd, callback);
 
     var cd = _.shallowCopy(paramd);
@@ -289,11 +284,6 @@ RedisTransport.prototype.list = function(paramd, callback) {
  */
 RedisTransport.prototype.added = function(paramd, callback) {
     var self = this;
-
-    if (arguments.length === 1) {
-        paramd = {};
-        callback = arguments[0];
-    }
 
     self._validate_added(paramd, callback);
 
@@ -399,11 +389,6 @@ RedisTransport.prototype.put = function(paramd, callback) {
  */
 RedisTransport.prototype.updated = function(paramd, callback) {
     var self = this;
-
-    if (arguments.length === 1) {
-        paramd = {};
-        callback = arguments[0];
-    }
 
     self._validate_updated(paramd, callback);
 
