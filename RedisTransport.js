@@ -301,21 +301,21 @@ RedisTransport.prototype.get = function(paramd, callback) {
     var channel = self.initd.channel(self.initd, paramd.id, paramd.band);
 
     var cd = _.shallowCopy(paramd);
+    cd.value = null;
 
+    // XXX - should differentiate between NotFound and network errors
     self._redis_client(function(error, client) {
         if (error) {
-            cd.error = error;
-            return callback(cd);
+            return callback(error, cd);
         }
 
         client.get(channel, function(error, result) {
             if (error) {
-                cd.error = error;
-                return callback(cd);
+                return callback(error, cd);
             }
 
             cd.value = self.initd.unpack(result);
-            callback(cd);
+            callback(null, cd);
         });
     });
 };
