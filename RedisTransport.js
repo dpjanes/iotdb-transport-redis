@@ -250,7 +250,7 @@ RedisTransport.prototype.list = function (paramd, callback) {
 
     self._redis_client(function (error, client) {
         if (error) {
-            ld = _.shallowCopy(paramd);
+            ld = _.d.clone.shallow(paramd);
             return callback(error, ld);
         }
 
@@ -270,7 +270,7 @@ RedisTransport.prototype.list = function (paramd, callback) {
 
                 seend[topic_id] = true;
 
-                ld = _.shallowCopy(paramd);
+                ld = _.d.clone.shallow(paramd);
                 ld.id = topic_id;
 
                 callback(null, ld);
@@ -303,7 +303,7 @@ RedisTransport.prototype.get = function (paramd, callback) {
 
     var channel = self.initd.channel(self.initd, paramd.id, paramd.band);
 
-    var cd = _.shallowCopy(paramd);
+    var cd = _.d.clone.shallow(paramd);
     cd.value = null;
 
     // XXX - should differentiate between NotFound and network errors
@@ -331,7 +331,7 @@ RedisTransport.prototype.put = function (paramd, callback) {
 
     self._validate_update(paramd, callback);
 
-    var cd = _.shallowCopy(paramd);
+    var cd = _.d.clone.shallow(paramd);
 
     if (self.initd.add_timestamp) {
         cd.value = _.timestamp.add(cd.value);
@@ -392,7 +392,7 @@ RedisTransport.prototype.updated = function (paramd, callback) {
 
     self._validate_updated(paramd, callback);
 
-    paramd = _.shallowCopy(paramd);
+    paramd = _.d.clone.shallow(paramd);
 
     var channel = self.initd.channel(self.initd, paramd.id || "*", paramd.band || "*");
 
@@ -412,7 +412,7 @@ RedisTransport.prototype.updated = function (paramd, callback) {
             return;
         }
 
-        var cd = _.shallowCopy(paramd);
+        var cd = _.d.clone.shallow(paramd);
         cd.id = topic_id || null;
         cd.band = topic_band || null;
         cd.value = undefined;
@@ -449,7 +449,7 @@ RedisTransport.prototype.bands = function (paramd, callback) {
 
     self._validate_bands(paramd, callback);
 
-    var bd = _.shallowCopy(paramd);
+    var bd = _.d.clone.shallow(paramd);
 
     callback(new errors.NotImplemented(), bd); // RD
 };
@@ -462,7 +462,7 @@ RedisTransport.prototype.remove = function (paramd, callback) {
 
     self._validate_remove(paramd, callback);
 
-    var rd = _.shallowCopy(paramd);
+    var rd = _.d.clone.shallow(paramd);
     delete rd.band;
     delete rd.value;
 
