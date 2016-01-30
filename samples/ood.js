@@ -29,7 +29,7 @@ var _update = function() {
         value: value,
     }, function(error, ud) {
         if (error) {
-            console.log("#", error);
+            console.log("#", _.error.message(error), _.error.code(error));
             return;
         }
         console.log("+ _update/put(callback)", ud);
