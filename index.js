@@ -22,4 +22,6 @@
 
 "use strict";
 
-exports.Transport = require('./RedisTransport').RedisTransport;
+var RedisTransport = require('./RedisTransport');
+exports.Transport = RedisTransport.RedisTransport;
+exports.connect = RedisTransport.connect;
