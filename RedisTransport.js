@@ -332,6 +332,10 @@ RedisTransport.prototype.list = function (paramd, callback) {
                     return;
                 }
 
+                if (_.is.Empty(parts[0]) || (parts[0] === '.')) {
+                    return;
+                }
+
                 var topic_id = parts[0];
                 if (seend[topic_id]) {
                     return;
