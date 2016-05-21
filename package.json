@@ -4,9 +4,10 @@
         "url": "https://github.com/dpjanes/iotdb-transport-redis/issues"
     }, 
     "dependencies": {
-        "async": "~2.0.0-rc.3", 
+        "async": "~2.0.0-rc.5", 
         "iotdb": ">=0.14.0", 
-        "iotdb-transport": "~0.0.32", 
+        "iotdb-errors": "~0.0.3", 
+        "iotdb-transport": "~0.0.35", 
         "redis": "~2.6.0-2", 
         "redis-scanner": "~0.1.1", 
         "validate": "~3.0.1"
@@ -19,7 +20,7 @@
         "grunt-contrib-uglify": "~1.0.1", 
         "grunt-contrib-watch": "~1.0.0", 
         "grunt-jsbeautifier": "~0.2.12", 
-        "jshint-stylish": "~2.1.0", 
+        "jshint-stylish": "~2.2.0", 
         "load-grunt-tasks": "~3.5.0", 
         "request": "~2.72.0"
     }, 
@@ -37,5 +38,5 @@
         "cover": "istanbul cover _mocha tests", 
         "test": "grunt"
     }, 
-    "version": "0.0.7"
+    "version": "0.0.8"
 }
