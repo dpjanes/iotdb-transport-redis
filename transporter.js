@@ -50,7 +50,7 @@ const make = (initd, redis_client) => {
             encode: s => s.replace(/[\/$%#.\]\[]/g, (c) => '%' + c.charCodeAt(0).toString(16)),
             decode: s => decodeURIComponent(s),
             unpack: (doc, d) => JSON.parse(doc.toString ? doc.toString() : doc),
-            pack: (d) => JSON.stringify(d),
+            pack: d => JSON.stringify(d.value),
         },
         iotdb.keystore().get("/transports/iotdb-transport-redis/initd"), {
             prefix: "/",
