@@ -29,6 +29,9 @@ const _ = iotdb._;
 const iotdb_transport = require('iotdb-transport');
 const errors = require('iotdb-errors');
 
+const assert = require('assert');
+const redis_scanner = require('redis-scanner');
+
 const logger = iotdb.logger({
     name: 'iotdb-transport-redis',
     module: 'transporter',
@@ -54,6 +57,7 @@ const make = (initd, redis_client) => {
         }
     );
 
+    /*
     self.rx.put = (observer, d) => {
         _redis_client.ensure(error => {
             if (error) {
@@ -84,10 +88,37 @@ const make = (initd, redis_client) => {
             });
         });
     };
+     */
 
 
     self.rx.list = (observer, d) => {
-        observer.onCompleted();
+        const channel = _initd.channel(_initd);
+
+        const seend = {};
+        const scanner = new redis_scanner.Scanner(_redis_client, 'SCAN', null, {
+            pattern: channel + "*",
+            onData: (topic) => {
+                const td = _initd.unchannel(_initd, topic);
+
+                if (seend[td.id]) {
+                    return;
+                }
+
+                seend[td.id] = true;
+
+                const rd = _.d.clone.shallow(d);
+                rd.id = td.id;
+                
+                observer.onNext(rd);
+            },
+            onEnd: function (error) {
+                if (error) {
+                    return observer.onError(error);
+                }
+
+                observer.onCompleted();
+            }
+        }).start();
     };
 
     self.rx.added = (observer, d) => {

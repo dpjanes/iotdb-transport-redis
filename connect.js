@@ -66,7 +66,7 @@ const connect = (initd, done) => {
     const _redis_client = redis.createClient({
         host: _initd.host,
         no_ready_check: true,
-        enable_offline_queue: false,
+        enable_offline_queue: true,
     });
     _redis_client.__connected_ever = false;
     _redis_client.__connected = false;
