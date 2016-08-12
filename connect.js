@@ -34,9 +34,8 @@ const _ = iotdb._;
 const iotdb_transport = require('iotdb-transport');
 const errors = require('iotdb-errors');
 
-const path = require('path');
-const mqtt = require('mqtt');
-const fs = require('fs');
+const redis = require('redis');
+const async = require('async');
 
 const util = require('util');
 
@@ -67,29 +66,59 @@ const connect = (initd, done) => {
     const _redis_client = redis.createClient({
         host: _initd.host,
         no_ready_check: true,
+        enable_offline_queue: false,
     });
     _redis_client.__connected_ever = false;
     _redis_client.__connected = false;
+    _redis_client.__logged_in = false;
 
     _redis_client.on("error", error => {
-        if (_redis_client.__connected_ever) {
+        logger.info({
+            method: "connect/on(error)",
+            error: _.error.message(error),
+        }, "error");
+
+        if (!_redis_client.__connected_ever) {
             _redis_client.removeAllListeners();
             return done(error);
         }
     });
-    _redis_client.on("connect", error => {
+    _redis_client.on("connect", () => {
         _redis_client.__connected = true;
         _redis_client.__connected_ever = true;
+
+        logger.info({
+            method: "connect/on(connect)",
+        }, "connected");
+
     });
-    _redis_client.on("reconnecting", error => {
+    _redis_client.on("reconnecting", () => {
         _redis_client.__connected = false;
+
+        logger.info({
+            method: "connect/on(reconnecting)",
+        }, "reconnecting");
+    });
+    _redis_client.on("end", () => {
+        logger.info({
+            method: "connect/on(end)",
+        }, "end");
     });
 
     _redis_client.ensure = (done) => {
-        if (client.__connected) {
-            done();
-        } else {
-            client.once("connect", () => done());
+        const _check = () => {
+            if (_redis_client.__connected && _redis_client.__logged_in) {
+                _redis_client.removeListener("connect", _check);
+                _redis_client.removeListener("__logged_in", _check);
+
+                done();
+                return true;
+            }
+        }
+
+        if (!_check()) {
+            _redis_client.on("connect", _check);
+            _redis_client.on("__logged_in", _check);
         }
     };
 
@@ -109,6 +138,9 @@ const connect = (initd, done) => {
     }
 
     ops.push(callback => {
+        _redis_client.__logged_in = true;
+        _redis_client.emit("__logged_in");
+
         callback(null, null);
     });
 
@@ -127,7 +159,7 @@ const connect = (initd, done) => {
             method: "_connect/async.series",
         }, "ready");
 
-        return done(null, connectd);
+        return done(null, null);
     });
 
     return _redis_client;

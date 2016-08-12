@@ -1,0 +1,5 @@
+{
+    "host": "redis.example.com",
+    "password": "somepassword",
+    "db": 2
+}
