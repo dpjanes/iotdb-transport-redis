@@ -49,76 +49,43 @@ const make = (initd, redis_client) => {
             unchannel: iotdb_transport.unchannel,
             encode: s => s.replace(/[\/$%#.\]\[]/g, (c) => '%' + c.charCodeAt(0).toString(16)),
             decode: s => decodeURIComponent(s),
-            unpack: (d, id, band) => JSON.parse(d.toString ? d.toString() : d),
-            pack: (d, id, band) => JSON.stringify(d),
+            unpack: (doc, d) => JSON.parse(doc.toString ? doc.toString() : doc),
+            pack: (d) => JSON.stringify(d),
         },
         iotdb.keystore().get("/transports/iotdb-transport-redis/initd"), {
             prefix: "/",
         }
     );
 
-    /*
-    self.rx.put = (observer, d) => {
-        _redis_client.ensure(error => {
-            if (error) {
-                return observer.onError(error);
-            }
-
-            const topic = _initd.channel(_initd, d.id, d.band);
-            const message = _initd.pack(d.value, d.id, d.band);
-
-            if (_initd.verbose) {
-                logger.info({
-                    topic: topic,
-                    message: message,
-                    message_type: typeof message,
-                }, "VERBOSE: sending message");
-            }
-
-            _redis_client.publish(topic, message, {
-                retain: _initd.retain,
-                qos: _initd.qos,
-            }, error => {
-                if (error) {
-                    return observer.onError(error);
-                }
-
-                observer.onNext(_.d.clone.shallow(d));
-                observer.onCompleted();
-            });
-        });
-    };
-     */
-
-
     self.rx.list = (observer, d) => {
-        const channel = _initd.channel(_initd);
+        _redis_client.ensure(error => {
+            const channel = _initd.channel(_initd);
+            const seend = {};
+            const scanner = new redis_scanner.Scanner(_redis_client, 'SCAN', null, {
+                pattern: channel + "*",
+                onData: (topic) => {
+                    const td = _initd.unchannel(_initd, topic);
 
-        const seend = {};
-        const scanner = new redis_scanner.Scanner(_redis_client, 'SCAN', null, {
-            pattern: channel + "*",
-            onData: (topic) => {
-                const td = _initd.unchannel(_initd, topic);
+                    if (seend[td.id]) {
+                        return;
+                    }
 
-                if (seend[td.id]) {
-                    return;
+                    seend[td.id] = true;
+
+                    const rd = _.d.clone.shallow(d);
+                    rd.id = td.id;
+                    
+                    observer.onNext(rd);
+                },
+                onEnd: function (error) {
+                    if (error) {
+                        return observer.onError(error);
+                    }
+
+                    observer.onCompleted();
                 }
-
-                seend[td.id] = true;
-
-                const rd = _.d.clone.shallow(d);
-                rd.id = td.id;
-                
-                observer.onNext(rd);
-            },
-            onEnd: function (error) {
-                if (error) {
-                    return observer.onError(error);
-                }
-
-                observer.onCompleted();
-            }
-        }).start();
+            }).start();
+        });
     };
 
     self.rx.added = (observer, d) => {
@@ -126,7 +93,37 @@ const make = (initd, redis_client) => {
     };
 
     self.rx.put = (observer, d) => {
-        observer.onCompleted();
+        _redis_client.ensure(error => {
+            if (error) {
+                return observer.onError(error);
+            }
+
+            const channel = _initd.channel(_initd, d.id, d.band);
+            _redis_client.get(channel, (error, doc) => {
+                if (error) {
+                    return observer.onError(error);
+                }
+
+                const rd = _.d.clone.shallow(d);
+                rd.value = _.timestamp.add(d.value);
+
+                const old_value = doc ? _initd.unpack(doc, d) : {};
+
+                if (!_.timestamp.check.dictionary(old_value, rd.value)) {
+                    return observer.onCompleted();
+                }
+
+                _redis_client.set(channel, _initd.pack(rd), (error, result) => {
+                    if (error) {
+                        return observer.onError(error);
+                    }
+
+                    observer.onNext(d);
+                    observer.onCompleted();
+                });
+
+            });
+        });
     };
     
     self.rx.get = (observer, d) => {
