@@ -59,7 +59,7 @@ const make = (initd, redis_client) => {
 
     self.rx.list = (observer, d) => {
         _redis_client.ensure(error => {
-            const channel = _initd.channel(_initd);
+            const channel = _initd.channel(_initd, {});
             const seend = {};
             const scanner = new redis_scanner.Scanner(_redis_client, 'SCAN', null, {
                 pattern: channel + "*",
@@ -98,7 +98,7 @@ const make = (initd, redis_client) => {
                 return observer.onError(error);
             }
 
-            const channel = _initd.channel(_initd, d.id, d.band);
+            const channel = _initd.channel(_initd, d);
             _redis_client.get(channel, (error, doc) => {
                 if (error) {
                     return observer.onError(error);
@@ -136,11 +136,7 @@ const make = (initd, redis_client) => {
                 return observer.onError(error);
             }
 
-            const channel = _initd.channel(_initd, d.id, d.band);
-            _redis_client.get(channel, (error, doc) => {
-                if (error) {
-                    return observer.onError(error);
-                }
+            const channel = _initd.channel(_initd, d);
 
                 const rd = _.d.clone.shallow(d);
                 rd.value = _initd.unpack(doc, rd);
