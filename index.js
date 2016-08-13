@@ -22,11 +22,5 @@
 
 "use strict";
 
-var RedisTransport = require('./RedisTransport');
-exports.Transport = RedisTransport.RedisTransport;
-exports.connect = RedisTransport.connect;
-
 const transporter = require('./transporter');
 exports.make = transporter.make;
-
-
