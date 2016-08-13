@@ -138,6 +138,11 @@ const make = (initd, redis_client) => {
 
             const channel = _initd.channel(_initd, d);
 
+            _redis_client.get(channel, (error, doc) => {
+                if (doc === null) {
+                    return observer.onCompleted();
+                }
+
                 const rd = _.d.clone.shallow(d);
                 rd.value = _initd.unpack(doc, rd);
 

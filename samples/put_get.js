@@ -15,5 +15,6 @@ const transport = require("./make").transport;
 setInterval(() => {
     console.log("-")
     testers.put(transport)
-    testers.get(transport);
+
+    setTimeout(() => testers.get(transport), 250);
 }, 2000);
