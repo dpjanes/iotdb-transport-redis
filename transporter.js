@@ -110,11 +110,7 @@ const make = (initd, redis_client) => {
                 const old_value = doc ? _initd.unpack(doc, d) : {};
 
                 if (!_.timestamp.check.dictionary(old_value, rd.value)) {
-                    if (d.silent_timestamp === false) {
-                        return observer.onCompleted();
-                    } else {
-                        return observer.onError(new errors.Timestamp());
-                    }
+                    return observer.onError(new errors.Timestamp());
                 }
 
                 _redis_client.set(channel, _initd.pack(rd), (error, result) => {
@@ -140,7 +136,7 @@ const make = (initd, redis_client) => {
 
             _redis_client.get(channel, (error, doc) => {
                 if (doc === null) {
-                    return observer.onCompleted();
+                    return observer.onError(new errors.NotFound());
                 }
 
                 const rd = _.d.clone.shallow(d);
@@ -153,6 +149,7 @@ const make = (initd, redis_client) => {
     };
     
     self.rx.bands = (observer, d) => {
+        // XXX implement me 
         observer.onCompleted();
     };
 
