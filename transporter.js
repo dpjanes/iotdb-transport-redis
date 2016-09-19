@@ -39,6 +39,7 @@ const logger = iotdb.logger({
 
 const make = (initd, redis_client) => {
     const self = iotdb_transport.make();
+    self.name = "iotdb-transport-redis";
 
     const _redis_client = redis_client;
     assert.ok(_redis_client);
@@ -78,7 +79,7 @@ const make = (initd, redis_client) => {
                     observer.onNext(rd);
                 },
                 onEnd: function (error) {
-                    if (error) {
+                    if (_.is.Error(error)) {
                         return observer.onError(error);
                     }
 
@@ -94,13 +95,13 @@ const make = (initd, redis_client) => {
 
     self.rx.put = (observer, d) => {
         _redis_client.ensure(error => {
-            if (error) {
+            if (_.is.Error(error)) {
                 return observer.onError(error);
             }
 
             const channel = _initd.channel(_initd, d);
             _redis_client.get(channel, (error, doc) => {
-                if (error) {
+                if (_.is.Error(error)) {
                     return observer.onError(error);
                 }
 
@@ -114,7 +115,7 @@ const make = (initd, redis_client) => {
                 }
 
                 _redis_client.set(channel, _initd.pack(rd), (error, result) => {
-                    if (error) {
+                    if (_.is.Error(error)) {
                         return observer.onError(error);
                     }
 
@@ -128,7 +129,7 @@ const make = (initd, redis_client) => {
     
     self.rx.get = (observer, d) => {
         _redis_client.ensure(error => {
-            if (error) {
+            if (_.is.Error(error)) {
                 return observer.onError(error);
             }
 
@@ -149,8 +150,28 @@ const make = (initd, redis_client) => {
     };
     
     self.rx.bands = (observer, d) => {
-        // XXX implement me 
-        observer.onCompleted();
+        _redis_client.ensure(error => {
+            const channel = _initd.channel(_initd, { id: d.id });
+            const scanner = new redis_scanner.Scanner(_redis_client, 'SCAN', null, {
+                pattern: channel + "*",
+                onData: (topic) => {
+                    const td = _initd.unchannel(_initd, topic);
+
+                    const rd = _.d.clone.shallow(d);
+                    rd.id = td.id;
+                    rd.band = td.band;
+                    
+                    observer.onNext(rd);
+                },
+                onEnd: function (error) {
+                    if (_.is.Error(error)) {
+                        return observer.onError(error);
+                    }
+
+                    observer.onCompleted();
+                }
+            }).start();
+        });
     };
 
     self.rx.updated = (observer, d) => {

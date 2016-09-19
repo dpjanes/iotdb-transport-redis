@@ -1,17 +1,17 @@
 # iotdb-transport-redis
-IOTDB Transport for moving data in and out of Redis
+[IOTDB](https://github.com/dpjanes/node-iotdb) 
+[Transporter](https://github.com/dpjanes/node-iotdb/blob/master/docs/transporters.md)
+for
+[Redis](http://redis.io/)
 
 <img src="https://raw.githubusercontent.com/dpjanes/iotdb-homestar/master/docs/HomeStar.png" align="right" />
 
-Stores in a [Redis](http://redis.io/) database. 
+# About
 
+This Transporter writes data to [Redis](http://redis.io/) in JSON with keys named like paths.
 _Currently does not have notification ability, we may add this in the near future._
 
-# Introduction
-
-Read about Transporters [here](https://github.com/dpjanes/iotdb-transport).
-
-This Transporter writes data to Redis in JSON with keys named like paths.
+* [Read more about Transporters](https://github.com/dpjanes/node-iotdb/blob/master/docs/transporters.md)
 
 # Use
 

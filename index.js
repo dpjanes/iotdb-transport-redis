@@ -24,3 +24,6 @@
 
 const transporter = require('./transporter');
 exports.make = transporter.make;
+
+const connect = require('./connect');
+exports.connect = connect.connect;
