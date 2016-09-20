@@ -178,6 +178,40 @@ const make = (initd, redis_client) => {
         observer.onCompleted();
     };
 
+    self.rx.remove = (observer, d) => {
+        const counter = _.counter(error => {
+            if (_.is.Error(error)) {
+                observer.onError(error);
+            } else {
+                observer.onCompleted();
+            }
+        });
+
+
+        _redis_client.ensure(error => {
+            counter.increment();
+
+            const channel = _initd.channel(_initd, { id: d.id });
+            const scanner = new redis_scanner.Scanner(_redis_client, 'SCAN', null, {
+                pattern: channel + "*",
+                onData: topic => {
+                    logger.info({
+                        topic: topic,
+                    }, "remove topic");
+
+                    counter.increment();
+                    _redis_client.del(topic, (error, result) => {
+                        counter.decrement();
+                    });
+                },
+                onEnd: error => {
+                    counter.decrement(error);
+                }
+            }).start();
+        });
+    };
+
+
     return self;
 };
 
