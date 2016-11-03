@@ -66,6 +66,12 @@ const make = (initd, redis_client) => {
                 pattern: channel + "*",
                 onData: (topic) => {
                     const td = _initd.unchannel(_initd, topic);
+                    if (!td.id) {
+                        logger.error({
+                            topic: topic,
+                        }, "weird - can't make sense of this topic - ignoring");
+                        return;
+                    }
 
                     if (seend[td.id]) {
                         return;
